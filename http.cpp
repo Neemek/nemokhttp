@@ -105,7 +105,7 @@ namespace HTTP
 
         bool prev_was_newline = false;
 
-        for (int i = 0; i < strlen(payload); i++)
+        for (int i = 0; i < (int)strlen(payload); i++)
         {
             char c = payload[i];
             if (!parsing_body)
@@ -140,11 +140,9 @@ namespace HTTP
         HTTP::RequestPayload data;
         char *fields[3] = {};
         int spaces = 0;
-        char *tmp = "";
+        stringstream tmp;
 
-        int status = 0;
-
-        for (int i = 0; i < strlen(payload); i++)
+        for (int i = 0; i < (int)strlen(payload); i++)
         {
             char c = payload[i];
             if (c == '\r')
@@ -162,12 +160,12 @@ namespace HTTP
 
             if (c == ' ')
             {
-                fields[spaces++] = tmp;
-                tmp = "";
+                fields[spaces++] = (char*)tmp.str().c_str();
+                tmp.str("");
                 continue;
             }
 
-            strcat(tmp, (char *)c);
+            tmp << c;
         }
 
         data.address = fields[1];
@@ -183,7 +181,7 @@ namespace HTTP
         int spaces = 0;
         stringstream tmp;
 
-        for (int i = 0; i < strlen(payload); i++)
+        for (int i = 0; i < (int)strlen(payload); i++)
         {
             char c = payload[i];
             if (c == '\r')
@@ -228,7 +226,7 @@ namespace HTTP
         int sock_fd = HTTP::open_socket(host, port);
 
         bool hasHost = false;
-        for (int i = 0; i < payload.headers.size(); i++)
+        for (int i = 0; i < (int)payload.headers.size(); i++)
         {
             if (payload.headers.at(i).rfind("Host:", 0) == 0)
             {
@@ -300,7 +298,7 @@ namespace HTTP
         std::cout << "Connected" << std::endl;
 
         bool hasHost = false;
-        for (int i = 0; i < payload.headers.size(); i++)
+        for (int i = 0; i < (int)payload.headers.size(); i++)
         {
             if (payload.headers.at(i).rfind("Host:", 0) == 0)
             {
@@ -369,7 +367,7 @@ namespace HTTP
             "OPTIONS",
             "TRACE"};
 
-        for (int i = 0; i < sizeof(methods); i++)
+        for (int i = 0; i < (int)sizeof(methods); i++)
         {
             if (methods[i] == m)
                 return static_cast<HTTP::Method>(i);
@@ -419,7 +417,7 @@ namespace HTTP
 
     HTTP::ResponsePayload Client::request(char *host, int port, char *address, Method method)
     {
-        return this->request(host, port, address, method, "");
+        return this->request(host, port, address, method, new char[0]);
     }
 
     HTTP::ResponsePayload Client::request(char *host, int port, char *address, Method method, char *body)
