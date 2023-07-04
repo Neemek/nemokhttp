@@ -3,12 +3,13 @@
 #include <string.h>
 #include <unistd.h>
 #include <iostream>
+using namespace HTTP;
 
 int main() {
-    HTTPClient client("www.google.com");
+    Client client("www.google.com");
     std::cout << "Initialized client :P" << std::endl;
 
-    HTTPResponsePayload res = client.get("/");
+    ResponsePayload res = client.get("/");
     std::cout << "Fetched route" << std::endl;
     std::cout << serialize_http_payload(res);
 

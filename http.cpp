@@ -10,7 +10,7 @@
 #include <openssl/err.h>
 using namespace std;
 
-int open_socket(char *host, int port)
+int HTTP::open_socket(char *host, int port)
 {
     int sock_fd, status;
     struct sockaddr_in serv_addr;
@@ -44,7 +44,7 @@ auto as_integer(Enumeration const value)
     return static_cast<typename std::underlying_type<Enumeration>::type>(value);
 }
 // The payload should already have Content-Length header if body is present
-std::string serialize_http_payload(HTTPPayload payload)
+std::string HTTP::serialize_http_payload(HTTP::Payload payload)
 {
     stringstream serialized;
 
@@ -63,13 +63,13 @@ std::string serialize_http_payload(HTTPPayload payload)
     return str;
 };
 
-std::string serialize_http_payload(HTTPRequestPayload payload)
+std::string HTTP::serialize_http_payload(HTTP::RequestPayload payload)
 {
     stringstream serialized;
 
-    serialized << method_to_string(payload.method) << " " << payload.address.c_str() << " HTTP/1.1\r\n";
+    serialized << HTTP::method_to_string(payload.method) << " " << payload.address.c_str() << " HTTP/1.1\r\n";
 
-    HTTPPayload reg_payload;
+    Payload reg_payload;
     reg_payload.headers = payload.headers;
     reg_payload.body = payload.body;
 
@@ -79,13 +79,13 @@ std::string serialize_http_payload(HTTPRequestPayload payload)
     return str;
 };
 
-std::string serialize_http_payload(HTTPResponsePayload payload)
+std::string HTTP::serialize_http_payload(HTTP::ResponsePayload payload)
 {
     stringstream serialized;
 
     serialized << "HTTP/1.1 " << std::to_string(as_integer(payload.status)).c_str() << " " << payload.readableStatus.c_str() << "\r\n";
 
-    HTTPPayload reg_payload;
+    HTTP::Payload reg_payload;
     reg_payload.headers = payload.headers;
     reg_payload.body = payload.body;
 
@@ -95,7 +95,7 @@ std::string serialize_http_payload(HTTPResponsePayload payload)
     return str;
 };
 
-HTTPPayload parse_http_payload(const char *payload)
+HTTP::Payload HTTP::parse_http_payload(const char *payload)
 {
     bool parsing_body = false;
     std::vector<std::string> headers;
@@ -124,7 +124,7 @@ HTTPPayload parse_http_payload(const char *payload)
         tmp << c;
     }
 
-    struct HTTPPayload data;
+    struct Payload data;
 
     auto str = tmp.str();
     data.body = str;
@@ -133,9 +133,9 @@ HTTPPayload parse_http_payload(const char *payload)
     return data;
 };
 
-HTTPRequestPayload parse_http_request_payload(char *payload)
+HTTP::RequestPayload HTTP::parse_http_request_payload(char *payload)
 {
-    HTTPRequestPayload data;
+    HTTP::RequestPayload data;
     char *fields[3] = {};
     int spaces = 0;
     char *tmp = "";
@@ -151,7 +151,7 @@ HTTPRequestPayload parse_http_request_payload(char *payload)
         if (c == '\n')
         {
             std::string as_string = std::string(payload);
-            HTTPPayload reg_data = parse_http_payload((char *)as_string.substr(i + 1).c_str());
+            HTTP::Payload reg_data = HTTP::parse_http_payload((char *)as_string.substr(i + 1).c_str());
 
             data.body = reg_data.body;
             data.headers = reg_data.headers;
@@ -174,9 +174,9 @@ HTTPRequestPayload parse_http_request_payload(char *payload)
     return data;
 };
 
-HTTPResponsePayload parse_http_response_payload(char *payload)
+HTTP::ResponsePayload HTTP::parse_http_response_payload(char *payload)
 {
-    HTTPResponsePayload data;
+    HTTP::ResponsePayload data;
     std::string fields[3] = {};
     int spaces = 0;
     stringstream tmp;
@@ -190,7 +190,7 @@ HTTPResponsePayload parse_http_response_payload(char *payload)
         if (c == '\n')
         {
             std::string as_string = std::string(payload);
-            HTTPPayload reg_data = parse_http_payload((char *)as_string.substr(i + 1).c_str());
+            HTTP::Payload reg_data = HTTP::parse_http_payload((char *)as_string.substr(i + 1).c_str());
 
             data.body = reg_data.body;
             data.headers = reg_data.headers;
@@ -209,21 +209,21 @@ HTTPResponsePayload parse_http_response_payload(char *payload)
     }
 
     data.statusCode = stoi(fields[1]);
-    data.status = static_cast<HTTPStatus>(data.statusCode);
+    data.status = static_cast<HTTP::Status>(data.statusCode);
     auto str = tmp.str();
     data.readableStatus = (char *)str.c_str();
 
     return data;
 };
 
-HTTPResponsePayload perform_http(char *host, int port, HTTPRequestPayload payload)
+HTTP::ResponsePayload HTTP::perform_http(char *host, int port, RequestPayload payload)
 {
     return perform_http(host, port, payload, 2 << 11);
 }
 
-HTTPResponsePayload perform_http(char *host, int port, HTTPRequestPayload payload, int nBytes)
+HTTP::ResponsePayload HTTP::perform_http(char *host, int port, HTTP::RequestPayload payload, int nBytes)
 {
-    int sock_fd = open_socket(host, port);
+    int sock_fd = HTTP::open_socket(host, port);
 
     bool hasHost = false;
     for (int i = 0; i < payload.headers.size(); i++)
@@ -240,7 +240,7 @@ HTTPResponsePayload perform_http(char *host, int port, HTTPRequestPayload payloa
         payload.headers.push_back(((string) "Host: ") + (string)host);
     }
 
-    std::string serialized_payload = serialize_http_payload(payload);
+    std::string serialized_payload = HTTP::serialize_http_payload(payload);
     write(sock_fd, serialized_payload.c_str(), strlen(serialized_payload.c_str()));
 
     char buffer[nBytes] = {0};
@@ -248,7 +248,7 @@ HTTPResponsePayload perform_http(char *host, int port, HTTPRequestPayload payloa
 
     close(sock_fd);
 
-    HTTPResponsePayload parsed = parse_http_response_payload(buffer);
+    HTTP::ResponsePayload parsed = HTTP::parse_http_response_payload(buffer);
 
     return parsed;
 };
@@ -265,15 +265,15 @@ SSL_CTX *create_ssl_context() {
     return ctx;
 }
 
-HTTPResponsePayload perform_https(SSL_CTX *ctx, char *host, int port, HTTPRequestPayload payload)
+HTTP::ResponsePayload HTTP::perform_https(SSL_CTX *ctx, char *host, int port, RequestPayload payload)
 {
-    return perform_https(ctx, host, port, payload, 2 << 11);
+    return HTTP::perform_https(ctx, host, port, payload, 2 << 11);
 }
 
-HTTPResponsePayload perform_https(SSL_CTX *ctx, char *host, int port, HTTPRequestPayload payload, int nBytes)
+HTTP::ResponsePayload HTTP::perform_https(SSL_CTX *ctx, char *host, int port, HTTP::RequestPayload payload, int nBytes)
 {
     std::cout << "Doing https" << std::endl;
-    int sock_fd = open_socket(host, port);
+    int sock_fd = HTTP::open_socket(host, port);
     std::cout << "Opened socket" << std::endl;
     SSL *ssl = SSL_new(ctx);
 
@@ -288,7 +288,7 @@ HTTPResponsePayload perform_https(SSL_CTX *ctx, char *host, int port, HTTPReques
 
     int status;
     if ((status = SSL_connect(ssl)) != 1) {
-        HTTPResponsePayload res;
+        HTTP::ResponsePayload res;
         return res;
     }
     std::cout << "Connected" << std::endl;
@@ -316,7 +316,7 @@ HTTPResponsePayload perform_https(SSL_CTX *ctx, char *host, int port, HTTPReques
     char buffer[nBytes] = {0};
     SSL_read(ssl, &buffer, nBytes);
 
-    HTTPResponsePayload parsed = parse_http_response_payload(buffer);
+    HTTP::ResponsePayload parsed = parse_http_response_payload(buffer);
 
     SSL_free(ssl);
     close(sock_fd);
@@ -324,34 +324,34 @@ HTTPResponsePayload perform_https(SSL_CTX *ctx, char *host, int port, HTTPReques
     return parsed;
 };
 
-const char *method_to_string(HTTPMethod m)
+const char *HTTP::method_to_string(HTTP::Method m)
 {
     switch (m)
     {
-    case HTTPMethod::GET:
+    case HTTP::Method::GET:
         return "GET";
-    case HTTPMethod::HEAD:
+    case HTTP::Method::HEAD:
         return "HEAD";
-    case HTTPMethod::POST:
+    case HTTP::Method::POST:
         return "POST";
-    case HTTPMethod::PUT:
+    case HTTP::Method::PUT:
         return "PUT";
-    case HTTPMethod::DELETE:
+    case HTTP::Method::DELETE:
         return "DELETE";
-    case HTTPMethod::CONNECT:
+    case HTTP::Method::CONNECT:
         return "CONNECT";
-    case HTTPMethod::OPTIONS:
+    case HTTP::Method::OPTIONS:
         return "OPTIONS";
-    case HTTPMethod::TRACE:
+    case HTTP::Method::TRACE:
         return "TRACE";
-    case HTTPMethod::PATCH:
+    case HTTP::Method::PATCH:
         return "PATCH";
     default:
         return "NONE";
     }
 };
 
-HTTPMethod method_from_string(const char *m)
+HTTP::Method HTTP::method_from_string(const char *m)
 {
     const char *methods[] = {
         "GET",
@@ -366,44 +366,44 @@ HTTPMethod method_from_string(const char *m)
     for (int i = 0; i < sizeof(methods); i++)
     {
         if (methods[i] == m)
-            return static_cast<HTTPMethod>(i);
+            return static_cast<HTTP::Method>(i);
     }
 
-    return HTTPMethod::GET;
+    return HTTP::Method::GET;
 };
 
-HTTPClient::HTTPClient(char *host)
+HTTP::Client::Client(char *host)
 {
     this->targetHost = host;
     this->ctx = create_ssl_context();
 }
 
-HTTPClient::~HTTPClient()
+HTTP::Client::~Client()
 {
     SSL_CTX_free(this->ctx);
 }
 
-void HTTPClient::clear_headers()
+void HTTP::Client::clear_headers()
 {
     this->headers.clear();
 }
 
-void HTTPClient::set_header(char *name, char *value)
+void HTTP::Client::set_header(char *name, char *value)
 {
     this->headers[name] = value;
 }
 
-HTTPResponsePayload HTTPClient::request(HTTPRequestPayload payload)
+HTTP::ResponsePayload HTTP::Client::request(RequestPayload payload)
 {
     return this->request(this->targetHost, payload);
 }
 
-HTTPResponsePayload HTTPClient::request(char *host, HTTPRequestPayload payload)
+HTTP::ResponsePayload HTTP::Client::request(char *host, RequestPayload payload)
 {
     return this->request(this->targetHost, this->determine_port(),  payload);
 }
 
-HTTPResponsePayload HTTPClient::request(char *host, int port, HTTPRequestPayload payload)
+HTTP::ResponsePayload HTTP::Client::request(char *host, int port, RequestPayload payload)
 {
     if (this->secure)
         return perform_https(this->ctx, host, port, payload);
@@ -411,14 +411,14 @@ HTTPResponsePayload HTTPClient::request(char *host, int port, HTTPRequestPayload
         return perform_http(host, port, payload);
 }
 
-HTTPResponsePayload HTTPClient::request(char *host, int port, char *address, HTTPMethod method)
+HTTP::ResponsePayload HTTP::Client::request(char *host, int port, char *address, Method method)
 {
     return this->request(host, port, address, method, "");
 }
 
-HTTPResponsePayload HTTPClient::request(char *host, int port, char *address, HTTPMethod method, char *body)
+HTTP::ResponsePayload HTTP::Client::request(char *host, int port, char *address, Method method, char *body)
 {
-    HTTPRequestPayload payload;
+    RequestPayload payload;
 
     payload.address = address;
     payload.method = method;
@@ -437,150 +437,150 @@ HTTPResponsePayload HTTPClient::request(char *host, int port, char *address, HTT
     return this->request(host, port, payload);
 }
 
-int HTTPClient::determine_port() {
+int HTTP::Client::determine_port() {
     return this->secure ? 443 : 80;
 }
 
-HTTPResponsePayload HTTPClient::get(char *address)
+HTTP::ResponsePayload HTTP::Client::get(char *address)
 {
     return this->get(address, this->targetHost);
 }
 
-HTTPResponsePayload HTTPClient::get(char *address, char *host)
+HTTP::ResponsePayload HTTP::Client::get(char *address, char *host)
 {
     return this->get(address, host, this->determine_port());
 }
 
-HTTPResponsePayload HTTPClient::get(char *address, char *host, int port)
+HTTP::ResponsePayload HTTP::Client::get(char *address, char *host, int port)
 {
-    return this->request(host, port, address, HTTPMethod::GET);
+    return this->request(host, port, address, Method::GET);
 }
 
-HTTPResponsePayload HTTPClient::head(char *address)
+HTTP::ResponsePayload HTTP::Client::head(char *address)
 {
     return this->head(address, this->targetHost);
 }
 
-HTTPResponsePayload HTTPClient::head(char *address, char *host)
+HTTP::ResponsePayload HTTP::Client::head(char *address, char *host)
 {
     return this->head(address, host);
 }
 
-HTTPResponsePayload HTTPClient::head(char *address, char *host, int port)
+HTTP::ResponsePayload HTTP::Client::head(char *address, char *host, int port)
 {
-    return this->request(host, port, address, HTTPMethod::HEAD);
+    return this->request(host, port, address, Method::HEAD);
 }
 
 // the Content-Length header should not be set
-HTTPResponsePayload HTTPClient::post(char *address, char *body)
+HTTP::ResponsePayload HTTP::Client::post(char *address, char *body)
 {
     return this->post(address, body, this->targetHost);
 }
 
 // the Content-Length header should not be set
-HTTPResponsePayload HTTPClient::post(char *address, char *body, char *host)
+HTTP::ResponsePayload HTTP::Client::post(char *address, char *body, char *host)
 {
     return this->post(address, body, host, this->determine_port());
 }
 
 // the Content-Length header should not be set
-HTTPResponsePayload HTTPClient::post(char *address, char *body, char *host, int port)
+HTTP::ResponsePayload HTTP::Client::post(char *address, char *body, char *host, int port)
 {
-    return this->request(host, port, address, HTTPMethod::POST, body);
+    return this->request(host, port, address, Method::POST, body);
 }
 
 // the Content-Length header should not be set
-HTTPResponsePayload HTTPClient::put(char *address, char *body)
+HTTP::ResponsePayload HTTP::Client::put(char *address, char *body)
 {
     return this->put(address, body, this->targetHost);
 }
 
 // the Content-Length header should not be set
-HTTPResponsePayload HTTPClient::put(char *address, char *body, char *host)
+HTTP::ResponsePayload HTTP::Client::put(char *address, char *body, char *host)
 {
     return this->put(address, body, host, this->determine_port());
 }
 
 // the Content-Length header should not be set
-HTTPResponsePayload HTTPClient::put(char *address, char *body, char *host, int port)
+HTTP::ResponsePayload HTTP::Client::put(char *address, char *body, char *host, int port)
 {
-    return this->request(host, port, address, HTTPMethod::PUT, body);
+    return this->request(host, port, address, Method::PUT, body);
 }
 
-HTTPResponsePayload HTTPClient::delet(char *address)
+HTTP::ResponsePayload HTTP::Client::delet(char *address)
 {
     return this->delet(address, this->targetHost);
 }
 
-HTTPResponsePayload HTTPClient::delet(char *address, char *host)
+HTTP::ResponsePayload HTTP::Client::delet(char *address, char *host)
 {
     return this->delet(address, host, this->determine_port());
 }
 
-HTTPResponsePayload HTTPClient::delet(char *address, char *host, int port)
+HTTP::ResponsePayload HTTP::Client::delet(char *address, char *host, int port)
 {
-    return this->request(host, port, address, HTTPMethod::DELETE);
+    return this->request(host, port, address, Method::DELETE);
 }
 
-HTTPResponsePayload HTTPClient::connect(char *address)
+HTTP::ResponsePayload HTTP::Client::connect(char *address)
 {
     return this->connect(address, this->targetHost);
 }
 
-HTTPResponsePayload HTTPClient::connect(char *address, char *host)
+HTTP::ResponsePayload HTTP::Client::connect(char *address, char *host)
 {
     return this->connect(address, host, this->determine_port());
 }
 
-HTTPResponsePayload HTTPClient::connect(char *address, char *host, int port)
+HTTP::ResponsePayload HTTP::Client::connect(char *address, char *host, int port)
 {
-    return this->request(host, port, address, HTTPMethod::CONNECT);
+    return this->request(host, port, address, Method::CONNECT);
 }
 
-HTTPResponsePayload HTTPClient::options(char *address)
+HTTP::ResponsePayload HTTP::Client::options(char *address)
 {
     return this->options(address, this->targetHost);
 }
 
-HTTPResponsePayload HTTPClient::options(char *address, char *host)
+HTTP::ResponsePayload HTTP::Client::options(char *address, char *host)
 {
     return this->options(address, host, this->determine_port());
 }
 
-HTTPResponsePayload HTTPClient::options(char *address, char *host, int port)
+HTTP::ResponsePayload HTTP::Client::options(char *address, char *host, int port)
 {
-    return this->request(host, port, address, HTTPMethod::OPTIONS);
+    return this->request(host, port, address, Method::OPTIONS);
 }
 
-HTTPResponsePayload HTTPClient::trace(char *address)
+HTTP::ResponsePayload HTTP::Client::trace(char *address)
 {
     return this->trace(address, this->targetHost);
 }
 
-HTTPResponsePayload HTTPClient::trace(char *address, char *host)
+HTTP::ResponsePayload HTTP::Client::trace(char *address, char *host)
 {
     return this->trace(address, host, this->determine_port());
 }
 
-HTTPResponsePayload HTTPClient::trace(char *address, char *host, int port)
+HTTP::ResponsePayload HTTP::Client::trace(char *address, char *host, int port)
 {
-    return this->request(host, port, address, HTTPMethod::TRACE);
+    return this->request(host, port, address, Method::TRACE);
 }
 
 // the Content-Length header should not be set
-HTTPResponsePayload HTTPClient::patch(char *address, char *body)
+HTTP::ResponsePayload HTTP::Client::patch(char *address, char *body)
 {
     return this->patch(address, body, this->targetHost);
 }
 
 // the Content-Length header should not be set
-HTTPResponsePayload HTTPClient::patch(char *address, char *body, char *host)
+HTTP::ResponsePayload HTTP::Client::patch(char *address, char *body, char *host)
 {
     return this->patch(address, body, host, this->determine_port());
 }
 
 // the Content-Length header should not be set
-HTTPResponsePayload HTTPClient::patch(char *address, char *body, char *host, int port)
+HTTP::ResponsePayload HTTP::Client::patch(char *address, char *body, char *host, int port)
 {
-    return this->request(host, port, address, HTTPMethod::PATCH, body);
+    return this->request(host, port, address, Method::PATCH, body);
 }
