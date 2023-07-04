@@ -5,7 +5,8 @@
 #include <iostream>
 using namespace HTTP;
 
-int main() {
+int main()
+{
     Client client("www.google.com");
     std::cout << "Initialized client :P" << std::endl;
 

@@ -253,11 +253,13 @@ HTTP::ResponsePayload HTTP::perform_http(char *host, int port, HTTP::RequestPayl
     return parsed;
 };
 
-SSL_CTX *create_ssl_context() {
+SSL_CTX *create_ssl_context()
+{
     const SSL_METHOD *method = TLS_client_method();
     SSL_CTX *ctx = SSL_CTX_new(method);
 
-    if (ctx == nullptr) {
+    if (ctx == nullptr)
+    {
         ERR_print_errors_fp(stderr);
         exit(EXIT_FAILURE);
     }
@@ -277,7 +279,8 @@ HTTP::ResponsePayload HTTP::perform_https(SSL_CTX *ctx, char *host, int port, HT
     std::cout << "Opened socket" << std::endl;
     SSL *ssl = SSL_new(ctx);
 
-    if (ssl == nullptr) {
+    if (ssl == nullptr)
+    {
         std::cout << "ssl was nullptr" << std::endl;
         ERR_print_errors_fp(stdout);
         exit(EXIT_FAILURE);
@@ -287,7 +290,8 @@ HTTP::ResponsePayload HTTP::perform_https(SSL_CTX *ctx, char *host, int port, HT
     SSL_set_fd(ssl, sock_fd);
 
     int status;
-    if ((status = SSL_connect(ssl)) != 1) {
+    if ((status = SSL_connect(ssl)) != 1)
+    {
         HTTP::ResponsePayload res;
         return res;
     }
@@ -400,7 +404,7 @@ HTTP::ResponsePayload HTTP::Client::request(RequestPayload payload)
 
 HTTP::ResponsePayload HTTP::Client::request(char *host, RequestPayload payload)
 {
-    return this->request(this->targetHost, this->determine_port(),  payload);
+    return this->request(this->targetHost, this->determine_port(), payload);
 }
 
 HTTP::ResponsePayload HTTP::Client::request(char *host, int port, RequestPayload payload)
@@ -437,7 +441,8 @@ HTTP::ResponsePayload HTTP::Client::request(char *host, int port, char *address,
     return this->request(host, port, payload);
 }
 
-int HTTP::Client::determine_port() {
+int HTTP::Client::determine_port()
+{
     return this->secure ? 443 : 80;
 }
 
